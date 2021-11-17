@@ -12,7 +12,7 @@ seed=${4:-239}
 
 mkdir -p "${model_dir}"
 set -e
-CUDA_VISIBLE_DEVICES=$cuda python -u code2seq.py \
+CUDA_VISIBLE_DEVICES=$cuda python -u /content/code2seq/code2seq.py \
   --data="${data}" \
   --test="${test}" \
   --save_prefix="${save_prefix}" \

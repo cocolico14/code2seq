@@ -1,3 +1,4 @@
+import absl.logging
 from argparse import ArgumentParser
 import numpy as np
 import tensorflow as tf
@@ -5,6 +6,18 @@ import tensorflow as tf
 from config import Config
 from interactive_predict import InteractivePredictor
 from model import Model
+
+import logging
+import os
+
+logging.disable(logging.WARNING)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+if type(tf.contrib) != type(tf):
+    tf.contrib._warning = None
+
+logging.root.removeHandler(absl.logging._absl_handler)
+absl.logging._warn_preinit_stderr = False
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -40,7 +53,8 @@ if __name__ == '__main__':
     if config.TEST_PATH and not args.data_path:
         results, precision, recall, f1, rouge = model.evaluate()
         print('Accuracy: ' + str(results))
-        print('Precision: ' + str(precision) + ', recall: ' + str(recall) + ', F1: ' + str(f1))
+        print('Precision: ' + str(precision) +
+              ', recall: ' + str(recall) + ', F1: ' + str(f1))
         print('Rouge: ', rouge)
     if args.predict:
         predictor = InteractivePredictor(config, model)
