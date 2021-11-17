@@ -83,6 +83,14 @@ class Model:
         print('Number of trainable params:',
               np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
         self.initialize_session_variables(self.sess)
+
+        variables_names = [v.name for v in tf.trainable_variables()]
+        values = self.sess.run(variables_names)
+        for k, v in zip(variables_names, values):
+            print("Variable: ", k)
+            print("Shape: ", v.shape)
+            print(v)
+
         print('Initalized variables')
         if self.config.LOAD_PATH:
             self.load_model(self.sess)
@@ -91,7 +99,7 @@ class Model:
         print('Started reader...')
 
         multi_batch_start_time = time.time()
-        for iteration in range(1, (self.config.NUM_EPOCHS // self.config.SAVE_EVERY_EPOCHS) + 1):
+        for _ in range(1, (self.config.NUM_EPOCHS // self.config.SAVE_EVERY_EPOCHS) + 1):
             self.queue_thread.reset(self.sess)
             try:
                 while True:
