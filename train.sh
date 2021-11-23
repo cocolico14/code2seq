@@ -14,4 +14,4 @@ model_dir=models/${type}
 
 mkdir -p ${model_dir}
 set -e
-python3 -u /content/code2seq/code2seq.py -d ${data} -te ${test_data} -l ${model_dir}/model
+python3 -u /content/code2seq/code2seq.py -d ${data} -te ${test_data} -l ${model_dir}/model -s ${model_dir}/model
