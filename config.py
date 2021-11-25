@@ -68,6 +68,7 @@ class Config:
         self.BEAM_WIDTH = 1
         self.USE_MOMENTUM = True
         self.RELEASE = args.release
+        self.TRANSFER = args.transfer
 
     @staticmethod
     def get_debug_config(args):

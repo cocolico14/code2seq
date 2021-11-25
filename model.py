@@ -84,15 +84,18 @@ class Model:
               np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
         self.initialize_session_variables(self.sess)
 
-        variables_names = [v.name for v in tf.trainable_variables()]
-        values = self.sess.run(variables_names)
-        for k, v in zip(variables_names, values):
-            print("Variable: ", k)
-            print("Shape: ", v.shape)
-            print(v)
+        # variables_names = [v.name for v in tf.trainable_variables()]
+        # values = self.sess.run(variables_names)
+        # for k, v in zip(variables_names, values):
+        #     print("Variable: ", k)
+        #     print("Shape: ", v.shape)
+        #     print(v)
 
         print('Initalized variables')
-        if self.config.LOAD_PATH:
+        if self.config.TRANSFER:
+            alt_saver = tf.train.Saver(tf.trainable_variables())
+            self.load_model(self.sess, alt_saver)
+        elif self.config.LOAD_PATH:
             self.load_model(self.sess)
 
         time.sleep(1)
@@ -748,9 +751,12 @@ class Model:
         print('Saved after %d epochs in: %s' %
               (self.epochs_trained, save_target))
 
-    def load_model(self, sess):
+    def load_model(self, sess, alt_saver=None):
         if not sess is None:
-            self.saver.restore(sess, self.config.LOAD_PATH)
+            if alt_saver:
+                alt_saver.restore(sess, self.config.LOAD_PATH)
+            else:
+                self.saver.restore(sess, self.config.LOAD_PATH)
             print('Done loading model')
         with open(self.config.LOAD_PATH + '.dict', 'rb') as file:
             if self.subtoken_to_index is not None:
@@ -773,6 +779,9 @@ class Model:
             saved_config = pickle.load(file)
             self.config.take_model_hyperparams_from(saved_config)
             print('Done loading dictionaries')
+
+    def transfer(self, sess):
+        pass
 
     @staticmethod
     def initialize_session_variables(sess):

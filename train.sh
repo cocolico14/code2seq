@@ -10,7 +10,7 @@ dataset_name=java-med
 data_dir=/content/drive/MyDrive/java-med
 data=${data_dir}/${dataset_name}
 test_data=${data_dir}/${dataset_name}.val.c2s
-model_dir=models/${type}
+model_dir=/content/drive/MyDrive/models
 
 mkdir -p ${model_dir}
 set -e

@@ -5,7 +5,8 @@ data_name=$(basename "${data_dir}")
 data=${data_dir}/${data_name}
 test=${data_dir}/${data_name}.val.c2s
 run_name=$2
-model_dir=models/python150k-${run_name}
+model_dir=/content/drive/MyDrive/models_py199kt
+load_prefix=/content/drive/MyDrive/models/model
 save_prefix=${model_dir}/model
 cuda=${3:-0}
 seed=${4:-239}
@@ -16,4 +17,6 @@ CUDA_VISIBLE_DEVICES=$cuda python -u /content/code2seq/code2seq.py \
   --data="${data}" \
   --test="${test}" \
   --save_prefix="${save_prefix}" \
-  --seed="${seed}"
+  --load=${load_prefix} \
+  --seed="${seed}" \
+  --debug

@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--release', action='store_true',
                         help='if specified and loading a trained model, release the loaded model for a smaller model '
                              'size.')
+    parser.add_argument('--transfer', type=bool, default=False)
     parser.add_argument('--predict', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--seed', type=int, default=239)
