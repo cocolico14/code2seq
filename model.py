@@ -103,7 +103,7 @@ class Model:
                 v1_np[2] = v1_np[1]
                 self.sess.run(tf.assign(v1, tf.convert_to_tensor(v1_np, dtype=tf.float32)))
                 print('TEST')
-                print(v1)
+                print(v1.eval(session=self.sess))
             print()
 
         time.sleep(1)
