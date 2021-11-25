@@ -84,19 +84,28 @@ class Model:
               np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
         self.initialize_session_variables(self.sess)
 
-        # variables_names = [v.name for v in tf.trainable_variables()]
-        # values = self.sess.run(variables_names)
-        # for k, v in zip(variables_names, values):
-        #     print("Variable: ", k)
-        #     print("Shape: ", v.shape)
-        #     print(v)
-
         print('Initalized variables')
         if self.config.TRANSFER:
             alt_saver = tf.train.Saver(tf.trainable_variables())
             self.load_model(self.sess, alt_saver)
         elif self.config.LOAD_PATH:
             self.load_model(self.sess)
+
+        variables_names = [v.name for v in tf.trainable_variables()]
+        values = self.sess.run(variables_names)
+        for k, v in zip(variables_names, values):
+            print("Variable: ", k)
+            print("Shape: ", v.shape)
+            print(v)
+            if k == "model/SUBTOKENS_VOCAB:0":
+                v1 = self.sess.graph.get_tensor_by_name("model/SUBTOKENS_VOCAB:0")
+                v2 = v1.copy()
+                v2[2] = v1[1]
+                self.sess.run(tf.assign(v1, v2))
+                v1 = self.sess.graph.get_tensor_by_name("model/SUBTOKENS_VOCAB:0")
+                print('TEST')
+                print(v1)
+            print()
 
         time.sleep(1)
         print('Started reader...')
