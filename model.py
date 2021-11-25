@@ -99,10 +99,9 @@ class Model:
             print(v)
             if k == "model/SUBTOKENS_VOCAB:0":
                 v1 = self.sess.graph.get_tensor_by_name("model/SUBTOKENS_VOCAB:0")
-                v2 = v1.copy()
-                v2[2] = v1[1]
-                self.sess.run(tf.assign(v1, v2))
-                v1 = self.sess.graph.get_tensor_by_name("model/SUBTOKENS_VOCAB:0")
+                v1_np = v1.numpy()
+                v1_np[2] = v1_np[1]
+                self.sess.run(tf.assign(v1, tf.convert_to_tensor(v1_np, dtype=tf.float32)))
                 print('TEST')
                 print(v1)
             print()
