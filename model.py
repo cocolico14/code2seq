@@ -607,7 +607,6 @@ class Model:
             context_embed = tf.nn.dropout(
                 context_embed, self.config.EMBEDDINGS_DROPOUT_KEEP_PROB)
 
-        print(np.shape(context_embed), self.config.DECODER_SIZE)
         batched_embed = tf.layers.dense(inputs=context_embed, units=self.config.DECODER_SIZE,
                                         activation=tf.nn.tanh, trainable=not is_evaluating and not freeze, use_bias=False)
 
