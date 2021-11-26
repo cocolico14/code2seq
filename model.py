@@ -812,7 +812,7 @@ class Model:
         self.subtoken_to_index = vocab['word_to_index']
         self.index_to_subtoken = vocab['index_to_word']
         self.reinitialize_embedding_weights(
-            sess, 'SUBTOKENS_VOCAB', idxs_to_update)
+            sess, 'SUBTOKENS_VOCAB', idxs_to_update, self.subtoken_vocab_size, self.config.EMBEDDINGS_SIZE)
 
         target_to_index, index_to_target, _ = Common.load_vocab_from_dict(
             target_to_count,
@@ -826,7 +826,7 @@ class Model:
         self.target_to_index = vocab['word_to_index']
         self.index_to_target = vocab['index_to_word']
         self.reinitialize_embedding_weights(
-            sess, 'TARGET_WORDS_VOCAB', idxs_to_update)
+            sess, 'TARGET_WORDS_VOCAB', idxs_to_update, self.target_vocab_size, self.config.EMBEDDINGS_SIZE)
 
         node_to_index, index_to_node, _ = Common.load_vocab_from_dict(
             node_to_count,
@@ -840,7 +840,7 @@ class Model:
         self.node_to_index = vocab['word_to_index']
         self.index_to_node = vocab['index_to_word']
         self.reinitialize_embedding_weights(
-            sess, 'NODES_VOCAB', idxs_to_update)
+            sess, 'NODES_VOCAB', idxs_to_update, self.nodes_vocab_size, self.config.EMBEDDINGS_SIZE)
 
     @staticmethod
     def initialize_session_variables(sess):
@@ -848,7 +848,7 @@ class Model:
                  tf.local_variables_initializer(), tf.tables_initializer()))
 
     @staticmethod
-    def reinitialize_embedding_weights(sess, name, idxs_to_update):
+    def reinitialize_embedding_weights(sess, name, idxs_to_update, in_size, out_size):
         variables_names = [v.name for v in tf.trainable_variables()]
         values = sess.run(variables_names)
         for k, _ in zip(variables_names, values):
@@ -856,7 +856,7 @@ class Model:
                 v1 = sess.graph.get_tensor_by_name(k)
                 v1_np = v1.eval(session=sess)
                 v1_np[idxs_to_update] = np.random.rand(
-                    len(idxs_to_update), np.shape(v1_np)[1])
+                    len(idxs_to_update), np.shape(v1_np)[1]) * np.sqrt(1/(in_size + out_size))
                 sess.run(tf.assign(v1, tf.convert_to_tensor(
                     v1_np, dtype=tf.float32)))
 
