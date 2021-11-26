@@ -465,12 +465,13 @@ class Model:
                 optimizer_frozen = tf.train.GradientDescentOptimizer(0)
 
                 grads = tf.gradients(loss, vars_unfrozen + vars_frozen)
+                clipped_grads, _ = tf.clip_by_global_norm(grads, clip_norm=5)
                 # grads_slow = grads[:len(vars_embeding)]
                 # grads_med = grads[len(vars_embeding):len(vars_encoding)]
                 # grads_fast = grads[len(vars_embeding)+len(vars_encoding):]
 
-                grads_fast = grads[:len(vars_embeding)]
-                grads_frozen = grads[len(vars_embeding):]
+                grads_fast = clipped_grads[:len(vars_embeding)]
+                grads_frozen = clipped_grads[len(vars_embeding):]
 
                 # train_op_slow = optimizer_slow.apply_gradients(
                 #     zip(grads_slow, vars_embeding))
