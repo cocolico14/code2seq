@@ -410,13 +410,15 @@ class Model:
                                                      target_input=path_target_indices,
                                                      valid_mask=valid_context_mask,
                                                      path_source_lengths=path_source_lengths,
-                                                     path_lengths=path_lengths, path_target_lengths=path_target_lengths)
+                                                     path_lengths=path_lengths, path_target_lengths=path_target_lengths,
+                                                     freeze=True)
 
             batch_size = tf.shape(target_index)[0]
             outputs, final_states = self.decode_outputs(target_words_vocab=target_words_vocab,
                                                         target_input=target_index, batch_size=batch_size,
                                                         batched_contexts=batched_contexts,
-                                                        valid_mask=valid_context_mask)
+                                                        valid_mask=valid_context_mask,
+                                                        freeze=True)
             step = tf.Variable(0, trainable=False)
 
             # (batch, max_output_length, dim * 2 + rnn_size)
@@ -450,13 +452,13 @@ class Model:
         return train_op, loss
 
     def decode_outputs(self, target_words_vocab, target_input, batch_size, batched_contexts, valid_mask,
-                       is_evaluating=False):
+                       is_evaluating=False, freeze=False):
         num_contexts_per_example = tf.count_nonzero(valid_mask, axis=-1)
 
         start_fill = tf.fill([batch_size],
                              self.target_to_index[Common.SOS])  # (batch, )
         decoder_cell = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.LSTMCell(self.config.DECODER_SIZE) for _ in range(self.config.NUM_DECODER_LAYERS)
+            tf.nn.rnn_cell.LSTMCell(self.config.DECODER_SIZE, trainable=not freeze) for _ in range(self.config.NUM_DECODER_LAYERS)
         ])
         contexts_sum = tf.reduce_sum(batched_contexts * tf.expand_dims(valid_mask, -1),
                                      axis=1)  # (batch_size, dim * 2 + rnn_size)
@@ -480,7 +482,7 @@ class Model:
         decoder_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention_mechanism,
                                                            attention_layer_size=self.config.DECODER_SIZE,
                                                            alignment_history=should_save_alignment_history)
-        if is_evaluating:
+        if is_evaluating or freeze:
             if self.config.BEAM_WIDTH > 0:
                 decoder_initial_state = decoder_cell.zero_state(dtype=tf.float32,
                                                                 batch_size=batch_size * self.config.BEAM_WIDTH)
@@ -522,10 +524,10 @@ class Model:
                                                                                           maximum_iterations=self.config.MAX_TARGET_PARTS + 1)
         return outputs, final_states
 
-    def calculate_path_abstraction(self, path_embed, path_lengths, valid_contexts_mask, is_evaluating=False):
-        return self.path_rnn_last_state(is_evaluating, path_embed, path_lengths, valid_contexts_mask)
+    def calculate_path_abstraction(self, path_embed, path_lengths, valid_contexts_mask, is_evaluating=False, freeze=False):
+        return self.path_rnn_last_state(is_evaluating, path_embed, path_lengths, valid_contexts_mask, freeze)
 
-    def path_rnn_last_state(self, is_evaluating, path_embed, path_lengths, valid_contexts_mask):
+    def path_rnn_last_state(self, is_evaluating, path_embed, path_lengths, valid_contexts_mask, freeze=False):
         # path_embed:           (batch, max_contexts, max_path_length+1, dim)
         # path_length:          (batch, max_contexts)
         # valid_contexts_mask:  (batch, max_contexts)
@@ -537,9 +539,11 @@ class Model:
         lengths = tf.multiply(tf.reshape(path_lengths, [-1]),
                               tf.cast(flat_valid_contexts_mask, tf.int32))  # (batch * max_contexts)
         if self.config.BIRNN:
-            rnn_cell_fw = tf.nn.rnn_cell.LSTMCell(self.config.RNN_SIZE / 2)
-            rnn_cell_bw = tf.nn.rnn_cell.LSTMCell(self.config.RNN_SIZE / 2)
-            if not is_evaluating:
+            rnn_cell_fw = tf.nn.rnn_cell.LSTMCell(
+                self.config.RNN_SIZE / 2, trainable=not freeze)
+            rnn_cell_bw = tf.nn.rnn_cell.LSTMCell(
+                self.config.RNN_SIZE / 2, trainable=not freeze)
+            if (not is_evaluating) or freeze:
                 rnn_cell_fw = tf.nn.rnn_cell.DropoutWrapper(rnn_cell_fw,
                                                             output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
                 rnn_cell_bw = tf.nn.rnn_cell.DropoutWrapper(rnn_cell_bw,
@@ -553,7 +557,8 @@ class Model:
             # (batch * max_contexts, rnn_size)
             final_rnn_state = tf.concat([state_fw.h, state_bw.h], axis=-1)
         else:
-            rnn_cell = tf.nn.rnn_cell.LSTMCell(self.config.RNN_SIZE)
+            rnn_cell = tf.nn.rnn_cell.LSTMCell(
+                self.config.RNN_SIZE, trainable=not freeze)
             if not is_evaluating:
                 rnn_cell = tf.nn.rnn_cell.DropoutWrapper(
                     rnn_cell, output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
@@ -570,7 +575,7 @@ class Model:
 
     def compute_contexts(self, subtoken_vocab, nodes_vocab, source_input, nodes_input,
                          target_input, valid_mask, path_source_lengths, path_lengths, path_target_lengths,
-                         is_evaluating=False):
+                         is_evaluating=False, freeze=False):
 
         source_word_embed = tf.nn.embedding_lookup(params=subtoken_vocab,
                                                    ids=source_input)  # (batch, max_contexts, max_name_parts, dim)
@@ -591,7 +596,7 @@ class Model:
         source_words_sum = tf.reduce_sum(source_word_embed * source_word_mask,
                                          axis=2)  # (batch, max_contexts, dim)
         path_nodes_aggregation = self.calculate_path_abstraction(path_embed, path_lengths, valid_mask,
-                                                                 is_evaluating)  # (batch, max_contexts, rnn_size)
+                                                                 is_evaluating, freeze)  # (batch, max_contexts, rnn_size)
         target_words_sum = tf.reduce_sum(
             target_word_embed * target_word_mask, axis=2)  # (batch, max_contexts, dim)
 
@@ -602,7 +607,7 @@ class Model:
                 context_embed, self.config.EMBEDDINGS_DROPOUT_KEEP_PROB)
 
         batched_embed = tf.layers.dense(inputs=context_embed, units=self.config.DECODER_SIZE,
-                                        activation=tf.nn.tanh, trainable=not is_evaluating, use_bias=False)
+                                        activation=tf.nn.tanh, trainable=not is_evaluating and not freeze, use_bias=False)
 
         return batched_embed
 
