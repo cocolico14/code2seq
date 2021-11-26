@@ -811,8 +811,6 @@ class Model:
                                                                'index_to_word': index_to_subtoken})
         self.subtoken_to_index = vocab['word_to_index']
         self.index_to_subtoken = vocab['index_to_word']
-        print('DEBUG', len(self.subtoken_to_index.keys()), len(
-            self.subtoken_to_index.keys() & subtoken_to_index.keys()), len(subtoken_to_index.keys()))
         self.reinitialize_embedding_weights(
             sess, 'SUBTOKENS_VOCAB', idxs_to_update)
 
@@ -857,10 +855,8 @@ class Model:
             if name in k:
                 v1 = sess.graph.get_tensor_by_name(k)
                 v1_np = v1.eval(session=sess)
-                # v1_np[idxs_to_update] = np.random.rand(
-                #     len(idxs_to_update), np.shape(v1_np)[1])
-                v1_np[idxs_to_update] = np.zeros((
-                    len(idxs_to_update), np.shape(v1_np)[1]))
+                v1_np[idxs_to_update] = np.random.rand(
+                    len(idxs_to_update), np.shape(v1_np)[1])
                 sess.run(tf.assign(v1, tf.convert_to_tensor(
                     v1_np, dtype=tf.float32)))
 
