@@ -506,8 +506,9 @@ class Model:
                                                           output_layer=projection_layer)
 
         else:
-            decoder_cell = tf.nn.rnn_cell.DropoutWrapper(decoder_cell,
-                                                         output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
+            if not freeze:
+                decoder_cell = tf.nn.rnn_cell.DropoutWrapper(decoder_cell,
+                                                             output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
             target_words_embedding = tf.nn.embedding_lookup(target_words_vocab,
                                                             tf.concat([tf.expand_dims(start_fill, -1), target_input],
                                                                       axis=-1))  # (batch, max_target_parts, dim * 2 + rnn_size)
@@ -606,6 +607,7 @@ class Model:
             context_embed = tf.nn.dropout(
                 context_embed, self.config.EMBEDDINGS_DROPOUT_KEEP_PROB)
 
+        print(np.shape(context_embed), self.config.DECODER_SIZE)
         batched_embed = tf.layers.dense(inputs=context_embed, units=self.config.DECODER_SIZE,
                                         activation=tf.nn.tanh, trainable=not is_evaluating and not freeze, use_bias=False)
 
