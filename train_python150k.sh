@@ -19,5 +19,4 @@ CUDA_VISIBLE_DEVICES=$cuda python -u /content/code2seq/code2seq.py \
   --save_prefix="${save_prefix}" \
   --load=${load_prefix} \
   --seed="${seed}" \
-  --debug \
   --transfer=True

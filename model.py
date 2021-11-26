@@ -410,15 +410,13 @@ class Model:
                                                      target_input=path_target_indices,
                                                      valid_mask=valid_context_mask,
                                                      path_source_lengths=path_source_lengths,
-                                                     path_lengths=path_lengths, path_target_lengths=path_target_lengths,
-                                                     freeze=True)
+                                                     path_lengths=path_lengths, path_target_lengths=path_target_lengths)
 
             batch_size = tf.shape(target_index)[0]
             outputs, final_states = self.decode_outputs(target_words_vocab=target_words_vocab,
                                                         target_input=target_index, batch_size=batch_size,
                                                         batched_contexts=batched_contexts,
-                                                        valid_mask=valid_context_mask,
-                                                        freeze=True)
+                                                        valid_mask=valid_context_mask)
             step = tf.Variable(0, trainable=False)
 
             # (batch, max_output_length, dim * 2 + rnn_size)
@@ -432,12 +430,29 @@ class Model:
                 crossent * target_words_nonzero) / tf.to_float(batch_size)
 
             if self.config.USE_MOMENTUM:
+                vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
+                                                                                   "model/TARGET_WORDS_VOCAB:0",
+                                                                                   "model/SUBTOKENS_VOCAB:0"]]
+                vars_frozen = [
+                    v for v in tf.trainable_variables() if not v in vars_unfrozen]
+
                 learning_rate = tf.train.exponential_decay(0.01, step * self.config.BATCH_SIZE,
                                                            self.num_training_examples,
                                                            0.95, staircase=True)
-                optimizer = tf.train.MomentumOptimizer(
+                optimizer_unfrozen = tf.train.MomentumOptimizer(
                     learning_rate, 0.95, use_nesterov=True)
-                train_op = optimizer.minimize(loss, global_step=step)
+                optimizer_frozen = tf.train.GradientDescentOptimizer(0)
+
+                grads = tf.gradients(loss, vars_unfrozen + vars_frozen)
+                grads_unfrozen = grads[:len(vars_unfrozen)]
+                grads_frozen = grads[len(vars_unfrozen):]
+
+                train_op_unfrozen = optimizer_unfrozen.apply_gradients(
+                    zip(grads_unfrozen, vars_unfrozen))
+                train_op_frozen = optimizer_frozen.apply_gradients(
+                    zip(grads_frozen, vars_frozen))
+
+                train_op = tf.group(train_op_unfrozen, train_op_frozen)
             else:
                 params = tf.trainable_variables()
                 gradients = tf.gradients(loss, params)
@@ -452,13 +467,13 @@ class Model:
         return train_op, loss
 
     def decode_outputs(self, target_words_vocab, target_input, batch_size, batched_contexts, valid_mask,
-                       is_evaluating=False, freeze=False):
+                       is_evaluating=False):
         num_contexts_per_example = tf.count_nonzero(valid_mask, axis=-1)
 
         start_fill = tf.fill([batch_size],
                              self.target_to_index[Common.SOS])  # (batch, )
         decoder_cell = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.LSTMCell(self.config.DECODER_SIZE, trainable=not freeze) for _ in range(self.config.NUM_DECODER_LAYERS)
+            tf.nn.rnn_cell.LSTMCell(self.config.DECODER_SIZE) for _ in range(self.config.NUM_DECODER_LAYERS)
         ])
         contexts_sum = tf.reduce_sum(batched_contexts * tf.expand_dims(valid_mask, -1),
                                      axis=1)  # (batch_size, dim * 2 + rnn_size)
@@ -467,7 +482,7 @@ class Model:
         fake_encoder_state = tuple(tf.nn.rnn_cell.LSTMStateTuple(contexts_average, contexts_average) for _ in
                                    range(self.config.NUM_DECODER_LAYERS))
         projection_layer = tf.layers.Dense(
-            self.target_vocab_size, use_bias=False, trainable=not freeze)
+            self.target_vocab_size, use_bias=False)
         if is_evaluating and self.config.BEAM_WIDTH > 0:
             batched_contexts = tf.contrib.seq2seq.tile_batch(
                 batched_contexts, multiplier=self.config.BEAM_WIDTH)
@@ -506,9 +521,8 @@ class Model:
                                                           output_layer=projection_layer)
 
         else:
-            if not freeze:
-                decoder_cell = tf.nn.rnn_cell.DropoutWrapper(decoder_cell,
-                                                             output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
+            decoder_cell = tf.nn.rnn_cell.DropoutWrapper(decoder_cell,
+                                                         output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
             target_words_embedding = tf.nn.embedding_lookup(target_words_vocab,
                                                             tf.concat([tf.expand_dims(start_fill, -1), target_input],
                                                                       axis=-1))  # (batch, max_target_parts, dim * 2 + rnn_size)
@@ -525,10 +539,10 @@ class Model:
                                                                                           maximum_iterations=self.config.MAX_TARGET_PARTS + 1)
         return outputs, final_states
 
-    def calculate_path_abstraction(self, path_embed, path_lengths, valid_contexts_mask, is_evaluating=False, freeze=False):
-        return self.path_rnn_last_state(is_evaluating, path_embed, path_lengths, valid_contexts_mask, freeze)
+    def calculate_path_abstraction(self, path_embed, path_lengths, valid_contexts_mask, is_evaluating=False):
+        return self.path_rnn_last_state(is_evaluating, path_embed, path_lengths, valid_contexts_mask)
 
-    def path_rnn_last_state(self, is_evaluating, path_embed, path_lengths, valid_contexts_mask, freeze=False):
+    def path_rnn_last_state(self, is_evaluating, path_embed, path_lengths, valid_contexts_mask):
         # path_embed:           (batch, max_contexts, max_path_length+1, dim)
         # path_length:          (batch, max_contexts)
         # valid_contexts_mask:  (batch, max_contexts)
@@ -541,10 +555,10 @@ class Model:
                               tf.cast(flat_valid_contexts_mask, tf.int32))  # (batch * max_contexts)
         if self.config.BIRNN:
             rnn_cell_fw = tf.nn.rnn_cell.LSTMCell(
-                self.config.RNN_SIZE / 2, trainable=not freeze)
+                self.config.RNN_SIZE / 2)
             rnn_cell_bw = tf.nn.rnn_cell.LSTMCell(
-                self.config.RNN_SIZE / 2, trainable=not freeze)
-            if (not is_evaluating) or freeze:
+                self.config.RNN_SIZE / 2)
+            if (not is_evaluating):
                 rnn_cell_fw = tf.nn.rnn_cell.DropoutWrapper(rnn_cell_fw,
                                                             output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
                 rnn_cell_bw = tf.nn.rnn_cell.DropoutWrapper(rnn_cell_bw,
@@ -559,7 +573,7 @@ class Model:
             final_rnn_state = tf.concat([state_fw.h, state_bw.h], axis=-1)
         else:
             rnn_cell = tf.nn.rnn_cell.LSTMCell(
-                self.config.RNN_SIZE, trainable=not freeze)
+                self.config.RNN_SIZE)
             if not is_evaluating:
                 rnn_cell = tf.nn.rnn_cell.DropoutWrapper(
                     rnn_cell, output_keep_prob=self.config.RNN_DROPOUT_KEEP_PROB)
@@ -576,7 +590,7 @@ class Model:
 
     def compute_contexts(self, subtoken_vocab, nodes_vocab, source_input, nodes_input,
                          target_input, valid_mask, path_source_lengths, path_lengths, path_target_lengths,
-                         is_evaluating=False, freeze=False):
+                         is_evaluating=False):
 
         source_word_embed = tf.nn.embedding_lookup(params=subtoken_vocab,
                                                    ids=source_input)  # (batch, max_contexts, max_name_parts, dim)
@@ -597,7 +611,7 @@ class Model:
         source_words_sum = tf.reduce_sum(source_word_embed * source_word_mask,
                                          axis=2)  # (batch, max_contexts, dim)
         path_nodes_aggregation = self.calculate_path_abstraction(path_embed, path_lengths, valid_mask,
-                                                                 is_evaluating, freeze)  # (batch, max_contexts, rnn_size)
+                                                                 is_evaluating)  # (batch, max_contexts, rnn_size)
         target_words_sum = tf.reduce_sum(
             target_word_embed * target_word_mask, axis=2)  # (batch, max_contexts, dim)
 
@@ -608,7 +622,7 @@ class Model:
                 context_embed, self.config.EMBEDDINGS_DROPOUT_KEEP_PROB)
 
         batched_embed = tf.layers.dense(inputs=context_embed, units=self.config.DECODER_SIZE,
-                                        activation=tf.nn.tanh, trainable=not is_evaluating and not freeze, use_bias=False)
+                                        activation=tf.nn.tanh, trainable=not is_evaluating, use_bias=False)
 
         return batched_embed
 
