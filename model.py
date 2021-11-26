@@ -430,9 +430,19 @@ class Model:
                 crossent * target_words_nonzero) / tf.to_float(batch_size)
 
             if self.config.USE_MOMENTUM:
-                vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
-                                                                                   "model/TARGET_WORDS_VOCAB:0",
-                                                                                   "model/SUBTOKENS_VOCAB:0"]]
+                # vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
+                #                                                                    "model/TARGET_WORDS_VOCAB:0",
+                #                                                                    "model/SUBTOKENS_VOCAB:0"]]
+                vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
+                                                                                   "model/bidirectional_rnn/fw/lstm_cell/bias:0",
+                                                                                   "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
+                                                                                   "model/bidirectional_rnn/bw/lstm_cell/bias:0",
+                                                                                   'model/dense/kernel:0']]
+                # vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
+                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
+                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
+                #                                                                    "model/decoder/attention_wrapper/attention_layer/kernel:0",
+                #                                                                    'model/decoder/dense/kernel:0']]
                 vars_frozen = [
                     v for v in tf.trainable_variables() if not v in vars_unfrozen]
 
@@ -825,8 +835,8 @@ class Model:
                                                                'index_to_word': index_to_subtoken})
         self.subtoken_to_index = vocab['word_to_index']
         self.index_to_subtoken = vocab['index_to_word']
-        self.reinitialize_embedding_weights(
-            sess, 'SUBTOKENS_VOCAB', idxs_to_update, self.subtoken_vocab_size, self.config.EMBEDDINGS_SIZE)
+        # self.reinitialize_embedding_weights(
+        #     sess, 'SUBTOKENS_VOCAB', idxs_to_update, self.subtoken_vocab_size, self.config.EMBEDDINGS_SIZE)
 
         target_to_index, index_to_target, _ = Common.load_vocab_from_dict(
             target_to_count,
@@ -839,8 +849,8 @@ class Model:
                                                                'index_to_word': index_to_target})
         self.target_to_index = vocab['word_to_index']
         self.index_to_target = vocab['index_to_word']
-        self.reinitialize_embedding_weights(
-            sess, 'TARGET_WORDS_VOCAB', idxs_to_update, self.target_vocab_size, self.config.EMBEDDINGS_SIZE)
+        # self.reinitialize_embedding_weights(
+        #     sess, 'TARGET_WORDS_VOCAB', idxs_to_update, self.target_vocab_size, self.config.EMBEDDINGS_SIZE)
 
         node_to_index, index_to_node, _ = Common.load_vocab_from_dict(
             node_to_count,
@@ -853,8 +863,8 @@ class Model:
                                                                'index_to_word': index_to_node})
         self.node_to_index = vocab['word_to_index']
         self.index_to_node = vocab['index_to_word']
-        self.reinitialize_embedding_weights(
-            sess, 'NODES_VOCAB', idxs_to_update, self.nodes_vocab_size, self.config.EMBEDDINGS_SIZE)
+        # self.reinitialize_embedding_weights(
+        #     sess, 'NODES_VOCAB', idxs_to_update, self.nodes_vocab_size, self.config.EMBEDDINGS_SIZE)
 
     @staticmethod
     def initialize_session_variables(sess):
