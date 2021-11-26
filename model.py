@@ -86,8 +86,10 @@ class Model:
 
         print('Initalized variables')
         if self.config.TRANSFER:
+            self.epochs_trained = 0
             alt_saver = tf.train.Saver(tf.trainable_variables())
             self.load_model(self.sess, alt_saver)
+            self.transfer_embeddings(self.sess)
         elif self.config.LOAD_PATH:
             self.load_model(self.sess)
 
@@ -97,14 +99,6 @@ class Model:
             print("Variable: ", k)
             print("Shape: ", v.shape)
             print(v)
-            if k == "model/SUBTOKENS_VOCAB:0":
-                v1 = self.sess.graph.get_tensor_by_name("model/SUBTOKENS_VOCAB:0")
-                v1_np = v1.eval(session=self.sess)
-                v1_np[2] = v1_np[1]
-                self.sess.run(tf.assign(v1, tf.convert_to_tensor(v1_np, dtype=tf.float32)))
-                print('TEST')
-                print(v1.eval(session=self.sess))
-            print()
 
         time.sleep(1)
         print('Started reader...')
@@ -788,13 +782,77 @@ class Model:
             self.config.take_model_hyperparams_from(saved_config)
             print('Done loading dictionaries')
 
-    def transfer(self, sess):
-        pass
+    def transfer_embeddings(self, sess):
+        with open('{}.dict.c2s'.format(self.config.TRAIN_PATH), 'rb') as file:
+            subtoken_to_count = pickle.load(file)
+            node_to_count = pickle.load(file)
+            target_to_count = pickle.load(file)
+            max_contexts = pickle.load(file)
+            self.num_training_examples = pickle.load(file)
+            print('Dictionaries loaded.')
+
+        if self.config.DATA_NUM_CONTEXTS <= 0:
+            self.config.DATA_NUM_CONTEXTS = max_contexts
+
+        subtoken_to_index, index_to_subtoken, _ = Common.load_vocab_from_dict(
+            subtoken_to_count,
+            add_values=[Common.PAD, Common.UNK],
+            max_size=self.config.SUBTOKENS_VOCAB_MAX_SIZE)
+
+        vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.subtoken_to_index,
+                                                               'index_to_word': self.index_to_subtoken},
+                                                              {'word_to_index': subtoken_to_index,
+                                                               'index_to_word': index_to_subtoken})
+        self.subtoken_to_index = vocab['word_to_index']
+        self.index_to_subtoken = vocab['index_to_word']
+        self.reinitialize_embedding_weights(
+            sess, 'SUBTOKENS_VOCAB', idxs_to_update)
+
+        target_to_index, index_to_target, _ = Common.load_vocab_from_dict(
+            target_to_count,
+            add_values=[Common.PAD, Common.UNK, Common.SOS],
+            max_size=self.config.TARGET_VOCAB_MAX_SIZE)
+
+        vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.target_to_index,
+                                                               'index_to_word': self.index_to_target},
+                                                              {'word_to_index': target_to_index,
+                                                               'index_to_word': index_to_target})
+        self.target_to_index = vocab['word_to_index']
+        self.index_to_target = vocab['index_to_word']
+        self.reinitialize_embedding_weights(
+            sess, 'TARGET_WORDS_VOCAB', idxs_to_update)
+
+        node_to_index, index_to_node, _ = Common.load_vocab_from_dict(
+            node_to_count,
+            add_values=[Common.PAD, Common.UNK],
+            max_size=None)
+
+        vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.node_to_index,
+                                                               'index_to_word': self.index_to_node},
+                                                              {'word_to_index': node_to_index,
+                                                               'index_to_word': index_to_node})
+        self.node_to_index = vocab['word_to_index']
+        self.index_to_node = vocab['index_to_word']
+        self.reinitialize_embedding_weights(
+            sess, 'NODES_VOCAB', idxs_to_update)
 
     @staticmethod
     def initialize_session_variables(sess):
         sess.run(tf.group(tf.global_variables_initializer(),
                  tf.local_variables_initializer(), tf.tables_initializer()))
+
+    @staticmethod
+    def reinitialize_embedding_weights(sess, name, idxs_to_update):
+        variables_names = [v.name for v in tf.trainable_variables()]
+        values = sess.run(variables_names)
+        for k, _ in zip(variables_names, values):
+            if name in k:
+                v1 = sess.graph.get_tensor_by_name(k)
+                v1_np = v1.eval(session=sess)
+                v1_np[idxs_to_update] = np.random.rand(
+                    len(idxs_to_update), np.shape(v1_np)[1])
+                sess.run(tf.assign(v1, tf.convert_to_tensor(
+                    v1_np, dtype=tf.float32)))
 
     def get_should_reuse_variables(self):
         if self.config.TRAIN_PATH:

@@ -47,6 +47,28 @@ class Common:
         return word_to_index, index_to_word, current_index
 
     @staticmethod
+    def update_vocab_from_dict(vocab, new_vocab):
+        indexs_to_remove = []
+        for ks, vs in vocab['word_to_index'].items(): # Safe to remove items
+            if new_vocab['word_to_index'].get(ks) is None: # Not in the new vocab dict
+                indexs_to_remove.append(vs)
+
+        idxs_to_update= []
+        for kd, _ in new_vocab['word_to_index'].items():
+            if vocab['word_to_index'].get(kd) is not None: # Already in the vocab dict
+                continue
+            else:
+                word_to_remove = vocab['index_to_word'][indexs_to_remove[0]]
+                del vocab['word_to_index'][word_to_remove]
+                vocab['index_to_word'][indexs_to_remove[0]] = kd
+                vocab['word_to_index'][kd] = indexs_to_remove[0]
+                idxs_to_update.append(indexs_to_remove[0])
+                if len(indexs_to_remove) > 1:
+                    indexs_to_remove = indexs_to_remove[1:]
+
+        return vocab, idxs_to_update
+
+    @staticmethod
     def binary_to_string(binary_string):
         return binary_string.decode("utf-8")
 
