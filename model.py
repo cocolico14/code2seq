@@ -447,17 +447,16 @@ class Model:
                 vars_frozen = [
                     v for v in tf.trainable_variables() if not v in vars_unfrozen]
 
-                learning_rate_slow = tf.train.exponential_decay(0.001, step * self.config.BATCH_SIZE,
-                                                                self.num_training_examples,
-                                                                0.95, staircase=True)
+                # learning_rate_slow = tf.train.exponential_decay(0.001, step * self.config.BATCH_SIZE,
+                #                                                 self.num_training_examples,
+                #                                                 0.95, staircase=True)
                 learning_rate_med = tf.train.exponential_decay(0.005, step * self.config.BATCH_SIZE,
                                                                self.num_training_examples,
                                                                0.95, staircase=True)
                 learning_rate_fast = tf.train.exponential_decay(0.01, step * self.config.BATCH_SIZE,
                                                                 self.num_training_examples,
                                                                 0.95, staircase=True)
-                optimizer_slow = tf.train.MomentumOptimizer(
-                    learning_rate_slow, 0.95, use_nesterov=True)
+                optimizer_slow = tf.train.GradientDescentOptimizer(0.001)
                 optimizer_med = tf.train.MomentumOptimizer(
                     learning_rate_med, 0.95, use_nesterov=True)
                 optimizer_fast = tf.train.MomentumOptimizer(
