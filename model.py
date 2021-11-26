@@ -467,7 +467,7 @@ class Model:
         fake_encoder_state = tuple(tf.nn.rnn_cell.LSTMStateTuple(contexts_average, contexts_average) for _ in
                                    range(self.config.NUM_DECODER_LAYERS))
         projection_layer = tf.layers.Dense(
-            self.target_vocab_size, use_bias=False)
+            self.target_vocab_size, use_bias=False, trainable=not freeze)
         if is_evaluating and self.config.BEAM_WIDTH > 0:
             batched_contexts = tf.contrib.seq2seq.tile_batch(
                 batched_contexts, multiplier=self.config.BEAM_WIDTH)
@@ -482,7 +482,7 @@ class Model:
         decoder_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention_mechanism,
                                                            attention_layer_size=self.config.DECODER_SIZE,
                                                            alignment_history=should_save_alignment_history)
-        if is_evaluating or freeze:
+        if is_evaluating:
             if self.config.BEAM_WIDTH > 0:
                 decoder_initial_state = decoder_cell.zero_state(dtype=tf.float32,
                                                                 batch_size=batch_size * self.config.BEAM_WIDTH)
