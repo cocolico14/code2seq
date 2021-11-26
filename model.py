@@ -433,16 +433,16 @@ class Model:
                 # vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
                 #                                                                    "model/TARGET_WORDS_VOCAB:0",
                 #                                                                    "model/SUBTOKENS_VOCAB:0"]]
-                vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
-                                                                                   "model/bidirectional_rnn/fw/lstm_cell/bias:0",
-                                                                                   "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
-                                                                                   "model/bidirectional_rnn/bw/lstm_cell/bias:0",
-                                                                                   'model/dense/kernel:0']]
-                # vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
-                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
-                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
-                #                                                                    "model/decoder/attention_wrapper/attention_layer/kernel:0",
-                #                                                                    'model/decoder/dense/kernel:0']]
+                # vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
+                #                                                                    "model/bidirectional_rnn/fw/lstm_cell/bias:0",
+                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
+                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/bias:0",
+                #                                                                    'model/dense/kernel:0']]
+                vars_unfrozen = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
+                                                                                   "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
+                                                                                   "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
+                                                                                   "model/decoder/attention_wrapper/attention_layer/kernel:0",
+                                                                                   'model/decoder/dense/kernel:0']]
                 vars_frozen = [
                     v for v in tf.trainable_variables() if not v in vars_unfrozen]
 
