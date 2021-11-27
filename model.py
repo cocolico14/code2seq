@@ -430,28 +430,23 @@ class Model:
                 crossent * target_words_nonzero) / tf.to_float(batch_size)
 
             if self.config.USE_MOMENTUM:
-                learning_rate = tf.train.exponential_decay(0.01, step * self.config.BATCH_SIZE,
-                                                           self.num_training_examples,
-                                                           0.95, staircase=True)
-                optimizer = tf.train.MomentumOptimizer(
-                    learning_rate, 0.95, use_nesterov=True)
-                train_op = optimizer.minimize(loss, global_step=step)
                 # vars_embeding = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
                 #                                                                    "model/TARGET_WORDS_VOCAB:0",
                 #                                                                    "model/SUBTOKENS_VOCAB:0"]]
-                # vars_encoding = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
-                #                                                                    "model/bidirectional_rnn/fw/lstm_cell/bias:0",
-                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
-                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/bias:0",
-                #                                                                    'model/dense/kernel:0']]
+                vars_encoding = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
+                                                                                   "model/bidirectional_rnn/fw/lstm_cell/bias:0",
+                                                                                   "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
+                                                                                   "model/bidirectional_rnn/bw/lstm_cell/bias:0",
+                                                                                   'model/dense/kernel:0']]
                 # vars_decoding = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
                 #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
                 #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
                 #                                                                    "model/decoder/attention_wrapper/attention_layer/kernel:0",
                 #                                                                    'model/decoder/dense/kernel:0']]
                 # vars_unfrozen = vars_embeding + vars_encoding + vars_decoding
-                # vars_frozen = [
-                #     v for v in tf.trainable_variables() if not v in vars_unfrozen]
+                vars_unfrozen = vars_encoding
+                vars_frozen = [
+                    v for v in tf.trainable_variables() if not v in vars_unfrozen]
 
                 # learning_rate_slow = tf.train.exponential_decay(0.001, step * self.config.BATCH_SIZE,
                 #                                                 self.num_training_examples,
@@ -459,24 +454,27 @@ class Model:
                 # learning_rate_med = tf.train.exponential_decay(0.005, step * self.config.BATCH_SIZE,
                 #                                                self.num_training_examples,
                 #                                                0.95, staircase=True)
-                # learning_rate_fast = tf.train.exponential_decay(0.01, step * self.config.BATCH_SIZE,
-                #                                                 self.num_training_examples,
-                #                                                 0.95, staircase=True)
+                learning_rate_fast = tf.train.exponential_decay(0.01, step * self.config.BATCH_SIZE,
+                                                                self.num_training_examples,
+                                                                0.95, staircase=True)
+
                 # optimizer_slow = tf.train.MomentumOptimizer(
                 #     learning_rate_slow, 0.95, use_nesterov=True)
                 # optimizer_med = tf.train.MomentumOptimizer(
                 #     learning_rate_med, 0.95, use_nesterov=True)
-                # optimizer_fast = tf.train.MomentumOptimizer(
-                #     learning_rate_fast, 0.95, use_nesterov=True)
-                # # optimizer_frozen = tf.train.GradientDescentOptimizer(0)
+                optimizer_fast = tf.train.MomentumOptimizer(
+                    learning_rate_fast, 0.95, use_nesterov=True)
+                optimizer_frozen = tf.train.GradientDescentOptimizer(0)
 
-                # grads = tf.gradients(loss, vars_unfrozen + vars_frozen)
-                # clipped_grads, _ = tf.clip_by_global_norm(grads, clip_norm=5)
+                grads = tf.gradients(loss, vars_unfrozen + vars_frozen)
+                clipped_grads, _ = tf.clip_by_global_norm(grads, clip_norm=5)
                 # grads_slow = clipped_grads[:len(vars_embeding)]
                 # grads_med = clipped_grads[len(
                 #     vars_embeding):len(vars_encoding)]
                 # grads_fast = clipped_grads[len(
                 #     vars_embeding)+len(vars_encoding):]
+                grads_fast = clipped_grads[:len(vars_encoding)]
+                grads_frozen = clipped_grads[len(vars_encoding):]
 
                 # train_op_slow = optimizer_slow.apply_gradients(
                 #     zip(grads_slow, vars_embeding))
@@ -484,8 +482,13 @@ class Model:
                 #     zip(grads_med, vars_encoding))
                 # train_op_fast = optimizer_fast.apply_gradients(
                 #     zip(grads_fast, vars_decoding + vars_frozen))
+                train_op_fast = optimizer_fast.apply_gradients(
+                    zip(grads_fast, vars_encoding))
+                train_op_frozen = optimizer_frozen.apply_gradients(
+                    zip(grads_frozen, vars_frozen))
 
                 # train_op = tf.group(train_op_slow, train_op_med, train_op_fast)
+                train_op = tf.group(train_op_fast, train_op_frozen)
 
             else:
                 params = tf.trainable_variables()
@@ -721,8 +724,8 @@ class Model:
                 self.predict_placeholder)
             reader_output = {key: tf.expand_dims(
                 tensor, 0) for key, tensor in reader_output.items()}
-            self.predict_top_indices_op, self.predict_top_scores_op, _, self.attention_weights_op = \
-                self.build_test_graph(reader_output)
+            self.predict_top_indices_op, self.predict_top_scores_op, _, self.attention_weights_op = self.build_test_graph(
+                reader_output)
             self.predict_source_string = reader_output[reader.PATH_SOURCE_STRINGS_KEY]
             self.predict_path_string = reader_output[reader.PATH_STRINGS_KEY]
             self.predict_path_target_string = reader_output[reader.PATH_TARGET_STRINGS_KEY]
@@ -767,7 +770,7 @@ class Model:
                            top_scores, attention_per_path))
         return results
 
-    @staticmethod
+    @ staticmethod
     def get_attention_per_path(source_strings, path_strings, target_strings, attention_weights):
         # attention_weights:  (time, contexts)
         results = []
@@ -856,7 +859,7 @@ class Model:
         vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.subtoken_to_index,
                                                                'index_to_word': self.index_to_subtoken},
                                                               {'word_to_index': subtoken_to_index,
-                                                               'index_to_word': index_to_subtoken})
+                                                              'index_to_word': index_to_subtoken})
         self.subtoken_to_index = vocab['word_to_index']
         self.index_to_subtoken = vocab['index_to_word']
         # self.reinitialize_embedding_weights(
@@ -870,7 +873,7 @@ class Model:
         vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.target_to_index,
                                                                'index_to_word': self.index_to_target},
                                                               {'word_to_index': target_to_index,
-                                                               'index_to_word': index_to_target})
+                                                              'index_to_word': index_to_target})
         self.target_to_index = vocab['word_to_index']
         self.index_to_target = vocab['index_to_word']
         # self.reinitialize_embedding_weights(
@@ -884,18 +887,18 @@ class Model:
         vocab, idxs_to_update = Common.update_vocab_from_dict({'word_to_index': self.node_to_index,
                                                                'index_to_word': self.index_to_node},
                                                               {'word_to_index': node_to_index,
-                                                               'index_to_word': index_to_node})
+                                                              'index_to_word': index_to_node})
         self.node_to_index = vocab['word_to_index']
         self.index_to_node = vocab['index_to_word']
         # self.reinitialize_embedding_weights(
         #     sess, 'NODES_VOCAB', idxs_to_update, self.nodes_vocab_size, self.config.EMBEDDINGS_SIZE)
 
-    @staticmethod
+    @ staticmethod
     def initialize_session_variables(sess):
         sess.run(tf.group(tf.global_variables_initializer(),
                  tf.local_variables_initializer(), tf.tables_initializer()))
 
-    @staticmethod
+    @ staticmethod
     def reinitialize_embedding_weights(sess, name, idxs_to_update, in_size, out_size):
         variables_names = [v.name for v in tf.trainable_variables()]
         values = sess.run(variables_names)
