@@ -433,18 +433,18 @@ class Model:
                 # vars_embeding = [v for v in tf.trainable_variables() if v.name in ["model/NODES_VOCAB:0",
                 #                                                                    "model/TARGET_WORDS_VOCAB:0",
                 #                                                                    "model/SUBTOKENS_VOCAB:0"]]
-                vars_encoding = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
-                                                                                   "model/bidirectional_rnn/fw/lstm_cell/bias:0",
-                                                                                   "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
-                                                                                   "model/bidirectional_rnn/bw/lstm_cell/bias:0",
-                                                                                   'model/dense/kernel:0']]
-                # vars_decoding = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
-                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
-                #                                                                    "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
-                #                                                                    "model/decoder/attention_wrapper/attention_layer/kernel:0",
-                #                                                                    'model/decoder/dense/kernel:0']]
+                # vars_encoding = [v for v in tf.trainable_variables() if v.name in ["model/bidirectional_rnn/fw/lstm_cell/kernel:0",
+                #                                                                    "model/bidirectional_rnn/fw/lstm_cell/bias:0",
+                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/kernel:0",
+                #                                                                    "model/bidirectional_rnn/bw/lstm_cell/bias:0",
+                #                                                                    'model/dense/kernel:0']]
+                vars_decoding = [v for v in tf.trainable_variables() if v.name in ["model/memory_layer/kernel:0",
+                                                                                   "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/kernel:0",
+                                                                                   "model/decoder/attention_wrapper/multi_rnn_cell/cell_0/lstm_cell/bias:0",
+                                                                                   "model/decoder/attention_wrapper/attention_layer/kernel:0",
+                                                                                   'model/decoder/dense/kernel:0']]
                 # vars_unfrozen = vars_embeding + vars_encoding + vars_decoding
-                vars_unfrozen = vars_encoding
+                vars_unfrozen = vars_decoding
                 vars_frozen = [
                     v for v in tf.trainable_variables() if not v in vars_unfrozen]
 
@@ -473,8 +473,8 @@ class Model:
                 #     vars_embeding):len(vars_encoding)]
                 # grads_fast = clipped_grads[len(
                 #     vars_embeding)+len(vars_encoding):]
-                grads_fast = clipped_grads[:len(vars_encoding)]
-                grads_frozen = clipped_grads[len(vars_encoding):]
+                grads_fast = clipped_grads[:len(vars_decoding)]
+                grads_frozen = clipped_grads[len(vars_decoding):]
 
                 # train_op_slow = optimizer_slow.apply_gradients(
                 #     zip(grads_slow, vars_embeding))
@@ -483,7 +483,7 @@ class Model:
                 # train_op_fast = optimizer_fast.apply_gradients(
                 #     zip(grads_fast, vars_decoding + vars_frozen))
                 train_op_fast = optimizer_fast.apply_gradients(
-                    zip(grads_fast, vars_encoding))
+                    zip(grads_fast, vars_decoding))
                 train_op_frozen = optimizer_frozen.apply_gradients(
                     zip(grads_frozen, vars_frozen))
 
